@@ -12,6 +12,8 @@ const EMAIL_SOURCE_FIELD = "email";
 const PRODUCT_NAME_SOURCE_FIELD = "Product name";
 const INVOICE_SOURCE_FIELD = "Order Invoice (from Link Orders) copy (from linkOrdersMaster)";
 const INVOICE_DEST_FIELD = "invoice";
+const READY_ROLLUP_SOURCE_FIELD = "Ready Rollup";
+const READY_DATE_DEST_FIELD = "Ready Date";
 const PAYMENT_PROOF_SOURCE_FIELD = "payment OLD created (from Link Orders) (from linkOrdersMaster)";
 const PAYMENT_PROOF_DEST_FIELD = "payment proof";
 const PAYMENT_PERCENT_SOURCE_FIELD = "PAYMENT (from linkOrdersMaster)";
@@ -46,13 +48,14 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, PAYMENT_PROOF_SOURCE_FIELD, PAYMENT_PERCENT_SOURCE_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, READY_ROLLUP_SOURCE_FIELD, PAYMENT_PROOF_SOURCE_FIELD, PAYMENT_PERCENT_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
 
 // Get attachments and payment info from the first record (all records in the order should have the same data)
 const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
+const readyRollupValue = matching[0].getCellValue(READY_ROLLUP_SOURCE_FIELD);
 const paymentProofAttachment = matching[0].getCellValue(PAYMENT_PROOF_SOURCE_FIELD);
 const paymentPercentRaw = matching[0].getCellValue(PAYMENT_PERCENT_SOURCE_FIELD);
 
@@ -328,8 +331,13 @@ if (overrideField) {
                 }
             }
             
+            // Add Ready Date from Ready Rollup if available
+            if (readyRollupValue) {
+                updateFields[READY_DATE_DEST_FIELD] = readyRollupValue;
+            }
+            
             await ordersTable.updateRecordAsync(mostRecentOrder.id, updateFields);
-            output.text(`   ✅ Order# override set to "${orderNumber}" and invoice copied`);
+            output.text(`   ✅ Order# override, invoice, and ready date updated`);
             
             // Wait before second update
             output.text("\n⏳ Waiting 3s before triggering AI...");
