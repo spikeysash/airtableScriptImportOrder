@@ -12,6 +12,9 @@ const EMAIL_SOURCE_FIELD = "email";
 const PRODUCT_NAME_SOURCE_FIELD = "Product name";
 const INVOICE_SOURCE_FIELD = "Order Invoice (from Link Orders) copy (from linkOrdersMaster)";
 const INVOICE_DEST_FIELD = "invoice";
+const PAYMENT_PROOF_SOURCE_FIELD = "payment OLD created (from Link Orders) (from linkOrdersMaster)";
+const PAYMENT_PROOF_DEST_FIELD = "payment proof";
+const PAYMENTS_TABLE = "payments";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
@@ -25,6 +28,7 @@ const oldOrdersTable = assertTable(OLD_ORDERS_TABLE);
 const newOrderSkuTable = assertTable(NEW_ORDER_SKU_TABLE);
 const ordersTable = assertTable(ORDERS_TABLE);
 const supplierTable = assertTable(SUPPLIER_TABLE);
+const paymentsTable = assertTable(PAYMENTS_TABLE);
 
 // === INPUT RECORD ===
 let inputRecord = await input.recordAsync("Select an order to import", oldOrdersTable);
@@ -37,15 +41,20 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, PAYMENT_PROOF_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
 
-// Get the invoice attachment from the first record (all records in the order should have the same invoice)
+// Get attachments from the first record (all records in the order should have the same attachments)
 const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
+const paymentProofAttachment = matching[0].getCellValue(PAYMENT_PROOF_SOURCE_FIELD);
+
 if (invoiceAttachment) {
     output.text(`📎 Found invoice attachment for this order`);
+}
+if (paymentProofAttachment) {
+    output.text(`💳 Found payment proof attachment for this order`);
 }
 
 // === LOAD EXISTING SUPPLIERS ===
@@ -371,4 +380,45 @@ if (overrideField) {
     output.text("⚠️ order#override field not found in orders table");
 }
 
-output.text("🎉 Import process complete!");
+// === UPDATE PAYMENT PROOF ===
+if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
+    output.text(`\n💳 Looking for payment record with Order#: ${orderNumber}...`);
+    
+    try {
+        // Query payments table for matching order#
+        const paymentsQuery = await paymentsTable.selectRecordsAsync();
+        
+        // Find payment record with matching order# (could be in different field names)
+        const paymentMatch = paymentsQuery.records.find(r => {
+            // Try common field names for order number
+            const orderNumField = paymentsTable.fields.find(f => 
+                f.name.toLowerCase().includes("order") && !f.name.toLowerCase().includes("link")
+            );
+            
+            if (orderNumField) {
+                const cellValue = r.getCellValue(orderNumField.name);
+                return String(cellValue) === String(orderNumber);
+            }
+            return false;
+        });
+        
+        if (paymentMatch) {
+            output.text(`✓ Found payment record: ${paymentMatch.id}`);
+            
+            await paymentsTable.updateRecordAsync(paymentMatch.id, {
+                [PAYMENT_PROOF_DEST_FIELD]: paymentProofAttachment
+            });
+            
+            output.text(`💳 Updated payment proof with ${paymentProofAttachment.length} attachment(s)`);
+            output.text(`✅ Payment proof copied to payments table`);
+        } else {
+            output.text(`⚠️ No payment record found for order ${orderNumber}`);
+        }
+    } catch (e) {
+        output.text(`❌ Failed to update payment proof: ${e.message}`);
+    }
+} else {
+    output.text(`\n⚠️ No payment proof attachment found in source`);
+}
+
+output.text("\n🎉 Import process complete!");
