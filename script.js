@@ -360,7 +360,9 @@ output.text("☑️ Source records marked as imported.");
 
 // === WAIT FOR AUTOMATION ===
 output.text("⏳ Waiting 5 seconds for order automation...");
+output.text("   (This allows the automation to create the order record)");
 await new Promise(r => setTimeout(r, 5000));
+output.text("   ✓ Wait complete");
 
 // === UPDATE ORDER#OVERRIDE ===
 output.text(`\n📋 Looking for most recent order record...`);
@@ -409,7 +411,9 @@ if (overrideField) {
             
             // Wait before second update
             output.text("\n⏳ Waiting 3 seconds before marking invoice as checked...");
+            output.text("   (Allowing order fields to settle before triggering AI)");
             await new Promise(r => setTimeout(r, 3000));
+            output.text("   ✓ Wait complete");
             
             // Second separate update: mark invoice as checked (triggers automation)
             try {
@@ -432,8 +436,15 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
-output.text("\n⏳ Waiting 15 seconds for payment automation and AI cost calculation...");
-await new Promise(r => setTimeout(r, 15000));
+output.text("\n⏳ Waiting 20 seconds for payment automation and AI cost calculation...");
+output.text("   (This allows the AI to analyze the invoice and calculate TotalCost AI)");
+for (let i = 1; i <= 20; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    if (i % 5 === 0) {
+        output.text(`   ... ${i} seconds elapsed ...`);
+    }
+}
+output.text("   ✓ Wait complete");
 
 // === GET TOTAL COST AI ===
 let totalCostAI = null;
