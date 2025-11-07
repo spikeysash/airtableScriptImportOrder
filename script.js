@@ -436,9 +436,9 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
-output.text("\n⏳ Waiting 20 seconds for payment automation and AI cost calculation...");
+output.text("\n⏳ Waiting 30 seconds for payment automation and AI cost calculation...");
 output.text("   (This allows the AI to analyze the invoice and calculate TotalCost AI)");
-for (let i = 1; i <= 20; i++) {
+for (let i = 1; i <= 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
     if (i % 5 === 0) {
         output.text(`   ... ${i} seconds elapsed ...`);
