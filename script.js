@@ -10,6 +10,8 @@ const NOTIFY_EMAIL_FIELD = "Notify Email";
 const PRODUCT_SHORT_FIELD = "Product short";
 const EMAIL_SOURCE_FIELD = "email";
 const PRODUCT_NAME_SOURCE_FIELD = "Product name";
+const INVOICE_SOURCE_FIELD = "Order Invoice (from Link Orders) copy (from linkOrdersMaster)";
+const INVOICE_DEST_FIELD = "invoice";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
@@ -35,10 +37,16 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
+
+// Get the invoice attachment from the first record (all records in the order should have the same invoice)
+const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
+if (invoiceAttachment) {
+    output.text(`📎 Found invoice attachment(s) for this order`);
+}
 
 // === LOAD EXISTING SUPPLIERS ===
 output.text(`\n🔍 CHECKING SUPPLIERS INFO TABLE FIELDS...`);
@@ -334,12 +342,27 @@ if (overrideField) {
         output.text(`Most recent order ID: ${mostRecentOrder.id}`);
         
         try {
-            await ordersTable.updateRecordAsync(mostRecentOrder.id, { 
+            // Build update object with order#override
+            const updateFields = { 
                 [overrideField.name]: String(orderNumber) 
-            });
+            };
+            
+            // Add invoice attachment if available
+            if (invoiceAttachment && Array.isArray(invoiceAttachment) && invoiceAttachment.length > 0) {
+                if (invoiceAttachment[0].url) {
+                    updateFields[INVOICE_DEST_FIELD] = invoiceAttachment;
+                    output.text(`📎 Adding ${invoiceAttachment.length} invoice attachment(s)`);
+                }
+            }
+            
+            await ordersTable.updateRecordAsync(mostRecentOrder.id, updateFields);
             output.text(`🔄 Updated ${overrideField.name} to "${orderNumber}" on record ${mostRecentOrder.id}`);
+            
+            if (updateFields[INVOICE_DEST_FIELD]) {
+                output.text(`✅ Invoice attachment copied to orders table`);
+            }
         } catch (e) {
-            output.text(`❌ Failed to update order#override: ${e.message}`);
+            output.text(`❌ Failed to update order record: ${e.message}`);
         }
     } else {
         output.text("⚠️ No records found in orders table");
