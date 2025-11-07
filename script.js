@@ -15,6 +15,7 @@ const INVOICE_DEST_FIELD = "invoice";
 const PAYMENT_PROOF_SOURCE_FIELD = "payment OLD created (from Link Orders) (from linkOrdersMaster)";
 const PAYMENT_PROOF_DEST_FIELD = "payment proof";
 const PAYMENTS_TABLE = "payments";
+const PAYMENT_RELEASED_FIELD = "Payment Released";
 const INVOICE_CHECKED_FIELD = "Invoice Checked and Correct";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
@@ -424,11 +425,13 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
             output.text(`✓ Found payment record: ${paymentMatch.id}`);
             
             await paymentsTable.updateRecordAsync(paymentMatch.id, {
-                [PAYMENT_PROOF_DEST_FIELD]: paymentProofAttachment
+                [PAYMENT_PROOF_DEST_FIELD]: paymentProofAttachment,
+                [PAYMENT_RELEASED_FIELD]: true
             });
             
             output.text(`💳 Updated payment proof with ${paymentProofAttachment.length} attachment(s)`);
             output.text(`✅ Payment proof copied to payments table`);
+            output.text(`✅ Marked "Payment Released" checkbox`);
         } else {
             output.text(`⚠️ No payment record found for order ${orderNumber}`);
         }
