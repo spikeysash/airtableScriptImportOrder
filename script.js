@@ -432,8 +432,8 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
-output.text("\n⏳ Waiting 10 seconds for payment automation and AI cost calculation...");
-await new Promise(r => setTimeout(r, 10000));
+output.text("\n⏳ Waiting 15 seconds for payment automation and AI cost calculation...");
+await new Promise(r => setTimeout(r, 15000));
 
 // === GET TOTAL COST AI ===
 let totalCostAI = null;
