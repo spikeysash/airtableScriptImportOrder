@@ -15,6 +15,7 @@ const INVOICE_DEST_FIELD = "invoice";
 const PAYMENT_PROOF_SOURCE_FIELD = "payment OLD created (from Link Orders) (from linkOrdersMaster)";
 const PAYMENT_PROOF_DEST_FIELD = "payment proof";
 const PAYMENTS_TABLE = "payments";
+const INVOICE_CHECKED_FIELD = "Invoice Checked and Correct";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
@@ -370,6 +371,21 @@ if (overrideField) {
             if (updateFields[INVOICE_DEST_FIELD]) {
                 output.text(`✅ Invoice attachment copied to orders table`);
             }
+            
+            // Wait before second update
+            output.text("\n⏳ Waiting 3 seconds before marking invoice as checked...");
+            await new Promise(r => setTimeout(r, 3000));
+            
+            // Second separate update: mark invoice as checked (triggers automation)
+            try {
+                await ordersTable.updateRecordAsync(mostRecentOrder.id, {
+                    [INVOICE_CHECKED_FIELD]: true
+                });
+                output.text(`✅ Marked "${INVOICE_CHECKED_FIELD}" checkbox on record ${mostRecentOrder.id}`);
+            } catch (e) {
+                output.text(`❌ Failed to mark invoice as checked: ${e.message}`);
+            }
+            
         } catch (e) {
             output.text(`❌ Failed to update order record: ${e.message}`);
         }
