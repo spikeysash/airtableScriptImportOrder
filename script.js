@@ -332,7 +332,12 @@ if (overrideField) {
             }
             
             // Add Ready Date from Ready Rollup if available
-            if (readyRollupValue) {
+            // Ready Rollup is a lookup field that returns an array of dates
+            if (readyRollupValue && Array.isArray(readyRollupValue) && readyRollupValue.length > 0) {
+                // Take the first date from the lookup array
+                updateFields[READY_DATE_DEST_FIELD] = readyRollupValue[0];
+            } else if (readyRollupValue && typeof readyRollupValue === 'string') {
+                // If it's already a string, use it directly
                 updateFields[READY_DATE_DEST_FIELD] = readyRollupValue;
             }
             
