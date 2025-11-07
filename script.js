@@ -446,16 +446,38 @@ for (let i = 1; i <= 30; i++) {
 }
 output.text("   ✓ Wait complete");
 
-// === GET TOTAL COST AI ===
+// === GET TOTAL COST AI WITH RETRY ===
 let totalCostAI = null;
 if (orderRecordId) {
     output.text(`\n💰 Fetching TotalCost AI from order ${orderRecordId}...`);
-    try {
-        const orderRecord = await ordersTable.selectRecordAsync(orderRecordId);
-        totalCostAI = orderRecord.getCellValue(TOTAL_COST_FIELD);
-        output.text(`TotalCost AI value: ${totalCostAI !== null ? totalCostAI : "NOT CALCULATED YET"}`);
-    } catch (e) {
-        output.text(`⚠️ Could not read order record: ${e.message}`);
+    
+    // Try up to 3 times with additional waits if null
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const orderRecord = await ordersTable.selectRecordAsync(orderRecordId);
+            totalCostAI = orderRecord.getCellValue(TOTAL_COST_FIELD);
+            output.text(`   Attempt ${attempt}: TotalCost AI = ${totalCostAI !== null ? totalCostAI : "NOT CALCULATED YET"}`);
+            
+            if (totalCostAI === null && attempt < 3) {
+                output.text(`   ⚠️ TotalCost AI is still null, waiting another 15 seconds...`);
+                for (let i = 1; i <= 15; i++) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    if (i % 5 === 0) {
+                        output.text(`      ... ${i} seconds elapsed ...`);
+                    }
+                }
+                output.text(`      ✓ Additional wait complete, retrying...`);
+            } else if (totalCostAI !== null) {
+                output.text(`   ✅ TotalCost AI successfully retrieved: ${totalCostAI}`);
+                break; // Exit loop if we got a value
+            }
+        } catch (e) {
+            output.text(`   ❌ Error fetching TotalCost AI (attempt ${attempt}): ${e.message}`);
+        }
+    }
+    
+    if (totalCostAI === null) {
+        output.text(`   ⚠️ TotalCost AI is still null after all attempts - AI may need more time or failed`);
     }
 }
 
