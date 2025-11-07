@@ -380,6 +380,10 @@ if (overrideField) {
     output.text("⚠️ order#override field not found in orders table");
 }
 
+// === WAIT FOR PAYMENT AUTOMATION ===
+output.text("\n⏳ Waiting 3 seconds for payment automation...");
+await new Promise(r => setTimeout(r, 3000));
+
 // === UPDATE PAYMENT PROOF ===
 if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
     output.text(`\n💳 Looking for payment record with Order#: ${orderNumber}...`);
