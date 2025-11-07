@@ -328,8 +328,8 @@ for (let r of matching) await oldOrdersTable.updateRecordAsync(r.id, { [IMPORTED
 output.text("☑️ Source records marked as imported.");
 
 // === WAIT FOR AUTOMATION ===
-output.text("⏳ Waiting 2 seconds...");
-await new Promise(r => setTimeout(r, 2000));
+output.text("⏳ Waiting 5 seconds for order automation...");
+await new Promise(r => setTimeout(r, 5000));
 
 // === UPDATE ORDER#OVERRIDE ===
 output.text(`\n📋 Looking for most recent order record...`);
@@ -381,8 +381,8 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION ===
-output.text("\n⏳ Waiting 3 seconds for payment automation...");
-await new Promise(r => setTimeout(r, 3000));
+output.text("\n⏳ Waiting 5 seconds for payment automation...");
+await new Promise(r => setTimeout(r, 5000));
 
 // === UPDATE PAYMENT PROOF ===
 if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
