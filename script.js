@@ -138,6 +138,28 @@ function normalizeToNumber(value) {
     return null;
 }
 
+function normalizePercentage(value) {
+    // Handle percentage strings like "30%" or arrays containing them
+    if (typeof value === "string") {
+        // Remove % sign and whitespace
+        const cleaned = value.replace(/[%\s]/g, "");
+        const parsed = parseFloat(cleaned);
+        if (!isNaN(parsed)) {
+            // Convert percentage to decimal (30 -> 0.3)
+            return parsed / 100;
+        }
+    }
+    if (Array.isArray(value) && value.length > 0) {
+        return normalizePercentage(value[0]);
+    }
+    // If it's already a number, assume it's in decimal format
+    if (typeof value === "number") {
+        // If it's > 1, assume it's a percentage that needs conversion
+        return value > 1 ? value / 100 : value;
+    }
+    return normalizeToNumber(value);
+}
+
 // === FIND OR CREATE SUPPLIER ===
 async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw, productNameRaw) {
     const name = normalizeToString(rawValue);
@@ -410,8 +432,8 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
-output.text("\n⏳ Waiting 5 seconds for payment automation and AI cost calculation...");
-await new Promise(r => setTimeout(r, 5000));
+output.text("\n⏳ Waiting 10 seconds for payment automation and AI cost calculation...");
+await new Promise(r => setTimeout(r, 10000));
 
 // === GET TOTAL COST AI ===
 let totalCostAI = null;
@@ -461,10 +483,10 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
             output.text(`  - TotalCost AI: ${totalCostAI}`);
             
             if (paymentPercentRaw && totalCostAI !== null) {
-                const paymentPercent = normalizeToNumber(paymentPercentRaw);
+                const paymentPercent = normalizePercentage(paymentPercentRaw);
                 const totalCost = normalizeToNumber(totalCostAI);
                 
-                output.text(`  - Payment % normalized: ${paymentPercent}`);
+                output.text(`  - Payment % normalized: ${paymentPercent} (as decimal)`);
                 output.text(`  - TotalCost normalized: ${totalCost}`);
                 
                 if (paymentPercent !== null && totalCost !== null) {
