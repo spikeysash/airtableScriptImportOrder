@@ -7,7 +7,9 @@ const SUPPLIER_TABLE = "suppliers info";
 const SUPPLIER_NAME_FIELD = "Company Name";
 const COMPANY_INFO_FIELD = "company info";
 const NOTIFY_EMAIL_FIELD = "Notify Email";
+const PRODUCT_SHORT_FIELD = "Product short";
 const EMAIL_SOURCE_FIELD = "email";
+const PRODUCT_NAME_SOURCE_FIELD = "Product Name";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
@@ -33,7 +35,7 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
@@ -111,7 +113,7 @@ function normalizeToNumber(value) {
 }
 
 // === FIND OR CREATE SUPPLIER ===
-async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw) {
+async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw, productNameRaw) {
     const name = normalizeToString(rawValue);
     if (!name) {
         output.text(`⚠️ No supplier name found (raw value: ${JSON.stringify(rawValue)})`);
@@ -172,6 +174,15 @@ async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw) {
             }
         }
         
+        // Add product short if available
+        if (productNameRaw) {
+            const productShort = normalizeToString(productNameRaw);
+            if (productShort) {
+                fields[PRODUCT_SHORT_FIELD] = productShort;
+                output.text(`   ✓ Adding product short: ${productShort}`);
+            }
+        }
+        
         const newId = await supplierTable.createRecordAsync(fields);
         supplierMap.set(key, newId);
         output.text(`✅ Created supplier with ID: ${newId}`);
@@ -192,22 +203,24 @@ for (let i = 0; i < matching.length; i++) {
     const supplierNameRaw = r.getCellValue("company name");
     const companyInfoRaw = r.getCellValue(COMPANY_INFO_FIELD);
     const emailRaw = r.getCellValue(EMAIL_SOURCE_FIELD);
+    const productNameRaw = r.getCellValue(PRODUCT_NAME_SOURCE_FIELD);
     
     // Debug output for each record
     output.text(`\n--- Record ${i + 1}/${matching.length} ---`);
     output.text(`Raw company name: ${JSON.stringify(supplierNameRaw)}`);
-    output.text(`Raw company info: ${JSON.stringify(companyInfoRaw)}`);
     output.text(`Raw email: ${JSON.stringify(emailRaw)}`);
+    output.text(`Raw product name: ${JSON.stringify(productNameRaw)}`);
     
     // Normalize all values to prevent [object Object] errors
     const sku = normalizeToString(skuRaw);
     const qty = normalizeToNumber(qtyRaw);
     const supplierName = normalizeToString(supplierNameRaw);
     const email = normalizeToString(emailRaw);
+    const productName = normalizeToString(productNameRaw);
     
-    output.text(`Normalized: SKU="${sku}", Qty=${qty}, Supplier="${supplierName}", Email="${email}"`);
+    output.text(`Normalized: SKU="${sku}", Qty=${qty}, Supplier="${supplierName}", Product="${productName}"`);
     
-    const supplierId = await getSupplierIdByName(supplierNameRaw, companyInfoRaw, emailRaw);
+    const supplierId = await getSupplierIdByName(supplierNameRaw, companyInfoRaw, emailRaw, productNameRaw);
     output.text(`Supplier ID: ${supplierId}`);
     
     // Build fields object, only including valid values
@@ -298,8 +311,8 @@ for (let r of matching) await oldOrdersTable.updateRecordAsync(r.id, { [IMPORTED
 output.text("☑️ Source records marked as imported.");
 
 // === WAIT FOR AUTOMATION ===
-output.text("⏳ Waiting 10 seconds...");
-await new Promise(r => setTimeout(r, 10000));
+output.text("⏳ Waiting 2 seconds...");
+await new Promise(r => setTimeout(r, 2000));
 
 // === UPDATE ORDER#OVERRIDE ===
 output.text(`\n📋 Looking for most recent order record...`);
