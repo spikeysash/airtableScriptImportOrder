@@ -405,21 +405,19 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
     output.text(`\n💳 Looking for payment record with Order#: ${orderNumber}...`);
     
     try {
-        // Query payments table for matching order#
-        const paymentsQuery = await paymentsTable.selectRecordsAsync();
+        // Query payments table for matching order# text field
+        const paymentsQuery = await paymentsTable.selectRecordsAsync({
+            fields: ["order# text"]
+        });
         
-        // Find payment record with matching order# (could be in different field names)
+        // Find payment record with matching order# text
         const paymentMatch = paymentsQuery.records.find(r => {
-            // Try common field names for order number
-            const orderNumField = paymentsTable.fields.find(f => 
-                f.name.toLowerCase().includes("order") && !f.name.toLowerCase().includes("link")
-            );
-            
-            if (orderNumField) {
-                const cellValue = r.getCellValue(orderNumField.name);
-                return String(cellValue) === String(orderNumber);
+            const cellValue = r.getCellValue("order# text");
+            const match = String(cellValue) === String(orderNumber);
+            if (match) {
+                output.text(`✓ Found payment with order# text: ${cellValue}`);
             }
-            return false;
+            return match;
         });
         
         if (paymentMatch) {
