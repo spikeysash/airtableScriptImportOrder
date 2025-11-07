@@ -59,11 +59,15 @@ const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
 // Debug: Show available fields in the source record
 output.text(`\n🔍 Debugging Ready Rollup field in source table:`);
 output.text(`   Looking for field: "${READY_ROLLUP_SOURCE_FIELD}"`);
-output.text(`   Available fields in source record:`);
+output.text(`   Available ready/date fields in source table:`);
 for (const field of oldOrdersTable.fields) {
-    const fieldValue = matching[0].getCellValue(field.name);
     if (field.name.toLowerCase().includes("ready") || field.name.toLowerCase().includes("date")) {
-        output.text(`      - "${field.name}" (${field.type}): ${JSON.stringify(fieldValue)}`);
+        try {
+            const fieldValue = matching[0].getCellValue(field.name);
+            output.text(`      - "${field.name}" (${field.type}): ${JSON.stringify(fieldValue)}`);
+        } catch (e) {
+            output.text(`      - "${field.name}" (${field.type}): [not queried]`);
+        }
     }
 }
 
