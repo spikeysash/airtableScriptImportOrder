@@ -1,0 +1,95 @@
+🧾 Project Overview
+
+You’re building an Airtable Scripting Block automation that, when triggered by pressing an “Import Order” button in the old-base sync (new orders) table, performs a series of actions to migrate order data into other tables, create suppliers if needed, and update statuses.
+
+🧰 Tables Involved
+Table	Purpose	Key Fields
+old-base sync (new orders)	Source of incoming order items	order #, sku clean, U/Ord, company name, imported (checkbox), Open URL (button)
+new order sku	Destination where each SKU line is created	sku, quantity requested, Supplier (linked to suppliers info), status (text)
+suppliers info	Master supplier list	Company Name (text), company info (text)
+orders	Target table created automatically by an Airtable automation	Order#, order#override, Product, etc.
+⚙️ What the Script Should Do
+1. Triggered via Button
+
+When the user presses the “import order” button in old-base sync (new orders) on a single record:
+
+The script identifies that record and reads its order #.
+
+2. Find Matching Records
+
+It finds all records in the same table that have the same order # (i.e., all SKUs belonging to that order).
+
+3. Create SKU Records
+
+For each matching record:
+
+Extract these fields:
+
+sku clean → write to new order sku → sku
+
+U/Ord → write to new order sku → quantity requested
+
+company name → link or create a record in suppliers info → Company Name, then link it in new order sku → Supplier
+
+👉 Important rule:
+If the supplier (by company name) doesn’t exist yet in suppliers info, create it as a plain text record with the name. Do not insert objects or arrays; Airtable needs { "Company Name": "some string" }.
+
+4. After All SKUs Are Created
+
+Once all SKUs for that order are added:
+
+Update their status to "approved".
+
+Update all the source records for that order in old-base sync (new orders) so that their checkbox field imported = true.
+
+5. Automation Wait + Orders Update
+
+Wait 10 seconds to allow an existing Airtable automation (that listens for new “approved” SKUs) to run.
+
+That automation creates a new record in the orders table.
+
+After 10 seconds:
+
+Find the record in orders whose Order# matches the one just imported.
+
+Update the order#override field in that record with the same order number as text (e.g., "241205-3365").
+
+🧯 Current Problems to Fix
+
+The Supplier field ends up with [object Object] entries instead of proper linked suppliers.
+→ The cause is that company name can be a linked record or array, so the script must normalize it into a plain string before using createRecordAsync().
+
+Occasionally, Airtable returns:
+
+Error: Failed schema validation: <root> must be an object
+
+
+→ This happens when createRecordAsync() or updateRecordAsync() receives invalid input (like undefined instead of { fieldName: value }).
+
+The script currently links suppliers incorrectly or sometimes doesn’t create them at all.
+
+✅ Deliverables
+
+Claude should produce a working Airtable script that:
+
+Runs in the scripting extension.
+
+Properly converts supplier names to strings.
+
+Creates supplier records in suppliers info if they don’t exist.
+
+Creates new SKU records in new order sku, linking the correct supplier.
+
+Updates SKU status = "approved" after creation.
+
+Marks source records’ imported = true.
+
+Waits 10 seconds.
+
+Updates order#override in orders.
+
+Never inserts [object Object] in any text field.
+
+Avoids the <root> must be object schema errors.
+
+Optionally, includes duplicate-checking so re-importing the same order doesn’t create duplicate SKUs.
