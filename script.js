@@ -55,6 +55,18 @@ if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderN
 
 // Get attachments and payment info from the first record (all records in the order should have the same data)
 const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
+
+// Debug: Show available fields in the source record
+output.text(`\n🔍 Debugging Ready Rollup field in source table:`);
+output.text(`   Looking for field: "${READY_ROLLUP_SOURCE_FIELD}"`);
+output.text(`   Available fields in source record:`);
+for (const field of oldOrdersTable.fields) {
+    const fieldValue = matching[0].getCellValue(field.name);
+    if (field.name.toLowerCase().includes("ready") || field.name.toLowerCase().includes("date")) {
+        output.text(`      - "${field.name}" (${field.type}): ${JSON.stringify(fieldValue)}`);
+    }
+}
+
 const readyRollupValue = matching[0].getCellValue(READY_ROLLUP_SOURCE_FIELD);
 const paymentProofAttachment = matching[0].getCellValue(PAYMENT_PROOF_SOURCE_FIELD);
 const paymentPercentRaw = matching[0].getCellValue(PAYMENT_PERCENT_SOURCE_FIELD);
