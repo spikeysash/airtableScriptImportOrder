@@ -332,13 +332,25 @@ if (overrideField) {
             }
             
             // Add Ready Date from Ready Rollup if available
+            // Debug: Show what we're getting from Ready Rollup
+            output.text(`   📅 Ready Rollup debug:`);
+            output.text(`      Type: ${typeof readyRollupValue}`);
+            output.text(`      Is Array: ${Array.isArray(readyRollupValue)}`);
+            output.text(`      Value: ${JSON.stringify(readyRollupValue)}`);
+            
             // Ready Rollup is a lookup field that returns an array of dates
             if (readyRollupValue && Array.isArray(readyRollupValue) && readyRollupValue.length > 0) {
                 // Take the first date from the lookup array
-                updateFields[READY_DATE_DEST_FIELD] = readyRollupValue[0];
+                const dateValue = readyRollupValue[0];
+                output.text(`      First element type: ${typeof dateValue}`);
+                output.text(`      First element value: ${JSON.stringify(dateValue)}`);
+                updateFields[READY_DATE_DEST_FIELD] = dateValue;
             } else if (readyRollupValue && typeof readyRollupValue === 'string') {
                 // If it's already a string, use it directly
+                output.text(`      Using as string: ${readyRollupValue}`);
                 updateFields[READY_DATE_DEST_FIELD] = readyRollupValue;
+            } else {
+                output.text(`      ⚠️ No valid Ready Rollup value found`);
             }
             
             await ordersTable.updateRecordAsync(mostRecentOrder.id, updateFields);
