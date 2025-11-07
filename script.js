@@ -9,7 +9,7 @@ const COMPANY_INFO_FIELD = "company info";
 const NOTIFY_EMAIL_FIELD = "Notify Email";
 const PRODUCT_SHORT_FIELD = "Product short";
 const EMAIL_SOURCE_FIELD = "email";
-const PRODUCT_NAME_SOURCE_FIELD = "Product Name";
+const PRODUCT_NAME_SOURCE_FIELD = "Product name";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
