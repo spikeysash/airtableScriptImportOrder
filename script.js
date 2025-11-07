@@ -452,6 +452,14 @@ if (orderRecordId) {
 if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
     output.text(`\n💳 Looking for payment record with Order#: ${orderNumber}...`);
     
+    // Debug: Show payments table fields
+    output.text(`\nPayments table fields:`);
+    for (const field of paymentsTable.fields) {
+        if (field.name.toLowerCase().includes("amount") || field.name.toLowerCase().includes("payment")) {
+            output.text(`  - "${field.name}" (${field.type})`);
+        }
+    }
+    
     try {
         // Query payments table for matching order# text field
         const paymentsQuery = await paymentsTable.selectRecordsAsync({
