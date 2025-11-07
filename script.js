@@ -14,6 +14,9 @@ const INVOICE_SOURCE_FIELD = "Order Invoice (from Link Orders) copy (from linkOr
 const INVOICE_DEST_FIELD = "invoice";
 const PAYMENT_PROOF_SOURCE_FIELD = "payment OLD created (from Link Orders) (from linkOrdersMaster)";
 const PAYMENT_PROOF_DEST_FIELD = "payment proof";
+const PAYMENT_PERCENT_SOURCE_FIELD = "PAYMENT (from linkOrdersMaster)";
+const PAYMENT_AMOUNT_DEST_FIELD = "payment amount";
+const TOTAL_COST_FIELD = "TotalCost AI";
 const PAYMENTS_TABLE = "payments";
 const PAYMENT_RELEASED_FIELD = "Payment Released";
 const INVOICE_CHECKED_FIELD = "Invoice Checked and Correct";
@@ -43,20 +46,24 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, PAYMENT_PROOF_SOURCE_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, PRODUCT_NAME_SOURCE_FIELD, INVOICE_SOURCE_FIELD, PAYMENT_PROOF_SOURCE_FIELD, PAYMENT_PERCENT_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
 
-// Get attachments from the first record (all records in the order should have the same attachments)
+// Get attachments and payment info from the first record (all records in the order should have the same data)
 const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
 const paymentProofAttachment = matching[0].getCellValue(PAYMENT_PROOF_SOURCE_FIELD);
+const paymentPercentRaw = matching[0].getCellValue(PAYMENT_PERCENT_SOURCE_FIELD);
 
 if (invoiceAttachment) {
     output.text(`📎 Found invoice attachment for this order`);
 }
 if (paymentProofAttachment) {
     output.text(`💳 Found payment proof attachment for this order`);
+}
+if (paymentPercentRaw) {
+    output.text(`💰 Found payment percentage: ${JSON.stringify(paymentPercentRaw)}`);
 }
 
 // === LOAD EXISTING SUPPLIERS ===
@@ -340,9 +347,14 @@ output.text(`\n📋 Looking for most recent order record...`);
 const overrideField = ordersTable.fields.find(f => f.name.toLowerCase().includes("override") && !f.name.toLowerCase().includes("checked"));
 output.text(`Override field found: ${overrideField?.name || "NOT FOUND"}`);
 
+// Store for later use in payment calculation
+let orderRecordId = null;
+let totalCostAI = null;
+
 if (overrideField) {
     // Query orders table and sort by ID descending (most recent first)
     const ordersQuery = await ordersTable.selectRecordsAsync({
+        fields: ["ID", TOTAL_COST_FIELD],
         sorts: [{ field: "ID", direction: "desc" }]
     });
     
@@ -350,7 +362,13 @@ if (overrideField) {
     
     if (ordersQuery.records.length > 0) {
         const mostRecentOrder = ordersQuery.records[0];
+        orderRecordId = mostRecentOrder.id;
+        totalCostAI = mostRecentOrder.getCellValue(TOTAL_COST_FIELD);
+        
         output.text(`Most recent order ID: ${mostRecentOrder.id}`);
+        if (totalCostAI) {
+            output.text(`TotalCost AI: ${totalCostAI}`);
+        }
         
         try {
             // Build update object
@@ -424,14 +442,32 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
         if (paymentMatch) {
             output.text(`✓ Found payment record: ${paymentMatch.id}`);
             
-            await paymentsTable.updateRecordAsync(paymentMatch.id, {
+            // Build payment update object
+            const paymentUpdateFields = {
                 [PAYMENT_PROOF_DEST_FIELD]: paymentProofAttachment,
                 [PAYMENT_RELEASED_FIELD]: true
-            });
+            };
+            
+            // Calculate payment amount if we have percentage and total cost
+            if (paymentPercentRaw && totalCostAI) {
+                const paymentPercent = normalizeToNumber(paymentPercentRaw);
+                const totalCost = normalizeToNumber(totalCostAI);
+                
+                if (paymentPercent !== null && totalCost !== null) {
+                    const paymentAmount = totalCost * paymentPercent;
+                    paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD] = paymentAmount;
+                    output.text(`💰 Calculated payment amount: ${totalCost} × ${paymentPercent} = ${paymentAmount}`);
+                }
+            }
+            
+            await paymentsTable.updateRecordAsync(paymentMatch.id, paymentUpdateFields);
             
             output.text(`💳 Updated payment proof with ${paymentProofAttachment.length} attachment(s)`);
             output.text(`✅ Payment proof copied to payments table`);
             output.text(`✅ Marked "Payment Released" checkbox`);
+            if (paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD]) {
+                output.text(`✅ Set payment amount: ${paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD]}`);
+            }
         } else {
             output.text(`⚠️ No payment record found for order ${orderNumber}`);
         }
