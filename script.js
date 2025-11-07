@@ -67,21 +67,6 @@ if (paymentPercentRaw) {
 }
 
 // === LOAD EXISTING SUPPLIERS ===
-output.text(`\n🔍 CHECKING SUPPLIERS INFO TABLE FIELDS...`);
-for (const field of supplierTable.fields) {
-    const readOnly = field.isComputed ? " [READ-ONLY/COMPUTED]" : "";
-    output.text(`  - "${field.name}" (${field.type})${readOnly}`);
-}
-
-// Find writable text fields
-const writableFields = supplierTable.fields.filter(f => 
-    !f.isComputed && (f.type === "multilineText" || f.type === "richText" || f.type === "singleLineText")
-);
-output.text(`\n📝 WRITABLE TEXT FIELDS:`);
-for (const field of writableFields) {
-    output.text(`  ✓ "${field.name}" (${field.type})`);
-}
-
 let supplierQuery = await supplierTable.selectRecordsAsync({ fields: [SUPPLIER_NAME_FIELD] });
 let supplierMap = new Map();
 for (let rec of supplierQuery.records) {
@@ -182,58 +167,37 @@ async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw, productNa
         
         // Add company info from source
         if (companyInfoRaw) {
-            output.text(`   Company info raw type: ${typeof companyInfoRaw}`);
-            output.text(`   Company info is array: ${Array.isArray(companyInfoRaw)}`);
-            
             // Check if it's attachments (array with url property)
             if (Array.isArray(companyInfoRaw) && companyInfoRaw.length > 0) {
                 if (companyInfoRaw[0].url) {
-                    // It's attachments - copy directly
                     fields[COMPANY_INFO_FIELD] = companyInfoRaw;
-                    output.text(`   ✓ Adding ${companyInfoRaw.length} attachment(s)`);
                 } else {
-                    // Array of strings - join them
                     const text = companyInfoRaw.map(item => normalizeToString(item)).filter(s => s).join(", ");
-                    if (text) {
-                        fields[COMPANY_INFO_FIELD] = text;
-                        output.text(`   ✓ Adding text: ${text}`);
-                    }
+                    if (text) fields[COMPANY_INFO_FIELD] = text;
                 }
             } else if (typeof companyInfoRaw === 'string') {
-                // Plain text
                 fields[COMPANY_INFO_FIELD] = companyInfoRaw;
-                output.text(`   ✓ Adding text: ${companyInfoRaw}`);
             } else {
-                // Try to normalize
                 const normalized = normalizeToString(companyInfoRaw);
-                if (normalized) {
-                    fields[COMPANY_INFO_FIELD] = normalized;
-                    output.text(`   ✓ Adding normalized: ${normalized}`);
-                }
+                if (normalized) fields[COMPANY_INFO_FIELD] = normalized;
             }
         }
         
         // Add email if available
         if (emailRaw) {
             const email = normalizeToString(emailRaw);
-            if (email) {
-                fields[NOTIFY_EMAIL_FIELD] = email;
-                output.text(`   ✓ Adding email: ${email}`);
-            }
+            if (email) fields[NOTIFY_EMAIL_FIELD] = email;
         }
         
         // Add product short if available
         if (productNameRaw) {
             const productShort = normalizeToString(productNameRaw);
-            if (productShort) {
-                fields[PRODUCT_SHORT_FIELD] = productShort;
-                output.text(`   ✓ Adding product short: ${productShort}`);
-            }
+            if (productShort) fields[PRODUCT_SHORT_FIELD] = productShort;
         }
         
         const newId = await supplierTable.createRecordAsync(fields);
         supplierMap.set(key, newId);
-        output.text(`✅ Created supplier with ID: ${newId}`);
+        output.text(`   ✅ Created`);
         return newId;
     } catch (e) {
         output.text(`❌ Failed to create supplier "${name}": ${e.message}`);
@@ -253,23 +217,14 @@ for (let i = 0; i < matching.length; i++) {
     const emailRaw = r.getCellValue(EMAIL_SOURCE_FIELD);
     const productNameRaw = r.getCellValue(PRODUCT_NAME_SOURCE_FIELD);
     
-    // Debug output for each record
-    output.text(`\n--- Record ${i + 1}/${matching.length} ---`);
-    output.text(`Raw company name: ${JSON.stringify(supplierNameRaw)}`);
-    output.text(`Raw email: ${JSON.stringify(emailRaw)}`);
-    output.text(`Raw product name: ${JSON.stringify(productNameRaw)}`);
-    
     // Normalize all values to prevent [object Object] errors
     const sku = normalizeToString(skuRaw);
     const qty = normalizeToNumber(qtyRaw);
     const supplierName = normalizeToString(supplierNameRaw);
-    const email = normalizeToString(emailRaw);
-    const productName = normalizeToString(productNameRaw);
     
-    output.text(`Normalized: SKU="${sku}", Qty=${qty}, Supplier="${supplierName}", Product="${productName}"`);
+    output.text(`\n${i + 1}/${matching.length}: ${sku} (Qty: ${qty}) - ${supplierName}`);
     
     const supplierId = await getSupplierIdByName(supplierNameRaw, companyInfoRaw, emailRaw, productNameRaw);
-    output.text(`Supplier ID: ${supplierId}`);
     
     // Build fields object, only including valid values
     const fields = {};
@@ -282,17 +237,7 @@ for (let i = 0; i < matching.length; i++) {
 
 // === CREATE IN BATCHES ===
 let createdRecordIds = [];
-output.text(`📋 Preparing to create ${newRecords.length} SKU records...`);
-
-// Validate all records before attempting creation
-for (let i = 0; i < newRecords.length; i++) {
-    const rec = newRecords[i];
-    if (!rec || typeof rec !== "object") {
-        output.text(`⚠️ Record ${i} is invalid: ${typeof rec}`);
-    } else if (!rec.fields || typeof rec.fields !== "object") {
-        output.text(`⚠️ Record ${i} has invalid fields: ${JSON.stringify(rec)}`);
-    }
-}
+output.text(`\n📋 Creating ${newRecords.length} SKU records...`);
 
 while (newRecords.length) {
     const batch = newRecords.slice(0, 50);
@@ -308,19 +253,16 @@ while (newRecords.length) {
         newRecords = newRecords.slice(50);
     } catch (e) {
         output.text(`❌ Error creating records: ${e.message}`);
-        output.text(`📦 First record in failed batch: ${JSON.stringify(batch[0], null, 2)}`);
         throw e;
     }
 }
-output.text(`✅ Created ${createdRecordIds.length} SKU records.`);
-output.text(`📊 Sample IDs: ${createdRecordIds.slice(0, 3).join(", ")}`);
+output.text(`   ✅ Created ${createdRecordIds.length} SKU records`);
 
 // Wait a moment for Airtable to process the new records
-output.text("⏳ Waiting 2 seconds for records to sync...");
 await new Promise(r => setTimeout(r, 2000));
 
 // === UPDATE STATUS ===
-output.text(`\n🔄 Updating status to 'approved' for ${createdRecordIds.length} records...`);
+output.text(`\n🔄 Setting status to 'approved'...`);
 
 if (createdRecordIds.length > 0) {
     try {
@@ -328,48 +270,37 @@ if (createdRecordIds.length > 0) {
         const freshQuery = await newOrderSkuTable.selectRecordsAsync();
         const freshRecords = freshQuery.records.filter(rec => createdRecordIds.includes(rec.id));
         
-        output.text(`Found ${freshRecords.length} fresh records to update`);
-        
         // Try updating them one by one with the record objects
         // For single select fields, must use {name: "value"} format
         let successCount = 0;
         for (const record of freshRecords) {
             try {
-                const updateData = { "status": { name: "approved" } };
-                output.text(`Sending update: ${JSON.stringify(updateData)}`);
-                
-                await newOrderSkuTable.updateRecordAsync(record, updateData);
+                await newOrderSkuTable.updateRecordAsync(record, { "status": { name: "approved" } });
                 successCount++;
-                output.text(`✓ Updated ${record.id}`);
             } catch (err) {
-                output.text(`❌ Failed ${record.id}: ${err.message}`);
+                output.text(`   ❌ Failed ${record.id}: ${err.message}`);
             }
         }
         
-        output.text(`✅ Successfully updated ${successCount}/${freshRecords.length} records.`);
+        output.text(`   ✅ Set ${successCount} SKU(s) to 'approved'`);
     } catch (e) {
-        output.text(`❌ Error updating status: ${e.message}`);
+        output.text(`   ❌ Error updating status: ${e.message}`);
     }
-} else {
-    output.text("⚠️ No records to update!");
 }
 
 // === MARK IMPORTED ===
 for (let r of matching) await oldOrdersTable.updateRecordAsync(r.id, { [IMPORTED_FIELD]: true });
-output.text("☑️ Source records marked as imported.");
+output.text(`   ✅ Source records marked as imported`);
 
 // === WAIT FOR AUTOMATION ===
-output.text("⏳ Waiting 5 seconds for order automation...");
-output.text("   (This allows the automation to create the order record)");
+output.text("\n⏳ Waiting 5s for order automation to create order record...");
 await new Promise(r => setTimeout(r, 5000));
-output.text("   ✓ Wait complete");
 
 // === UPDATE ORDER#OVERRIDE ===
-output.text(`\n📋 Looking for most recent order record...`);
+output.text(`\n📋 Updating order record...`);
 
 // Find the order#override field
 const overrideField = ordersTable.fields.find(f => f.name.toLowerCase().includes("override") && !f.name.toLowerCase().includes("checked"));
-output.text(`Override field found: ${overrideField?.name || "NOT FOUND"}`);
 
 // Store order record ID for later use in payment calculation
 let orderRecordId = null;
@@ -380,13 +311,9 @@ if (overrideField) {
         sorts: [{ field: "ID", direction: "desc" }]
     });
     
-    output.text(`Found ${ordersQuery.records.length} records in orders table`);
-    
     if (ordersQuery.records.length > 0) {
         const mostRecentOrder = ordersQuery.records[0];
         orderRecordId = mostRecentOrder.id;
-        
-        output.text(`Most recent order ID: ${mostRecentOrder.id}`);
         
         try {
             // Build update object
@@ -398,31 +325,24 @@ if (overrideField) {
             if (invoiceAttachment && Array.isArray(invoiceAttachment) && invoiceAttachment.length > 0) {
                 if (invoiceAttachment[0].url) {
                     updateFields[INVOICE_DEST_FIELD] = invoiceAttachment;
-                    output.text(`📎 Adding ${invoiceAttachment.length} invoice attachment(s)`);
                 }
             }
             
             await ordersTable.updateRecordAsync(mostRecentOrder.id, updateFields);
-            output.text(`🔄 Updated ${overrideField.name} to "${orderNumber}" on record ${mostRecentOrder.id}`);
-            
-            if (updateFields[INVOICE_DEST_FIELD]) {
-                output.text(`✅ Invoice attachment copied to orders table`);
-            }
+            output.text(`   ✅ Order# override set to "${orderNumber}" and invoice copied`);
             
             // Wait before second update
-            output.text("\n⏳ Waiting 3 seconds before marking invoice as checked...");
-            output.text("   (Allowing order fields to settle before triggering AI)");
+            output.text("\n⏳ Waiting 3s before triggering AI...");
             await new Promise(r => setTimeout(r, 3000));
-            output.text("   ✓ Wait complete");
             
             // Second separate update: mark invoice as checked (triggers automation)
             try {
                 await ordersTable.updateRecordAsync(mostRecentOrder.id, {
                     [INVOICE_CHECKED_FIELD]: true
                 });
-                output.text(`✅ Marked "${INVOICE_CHECKED_FIELD}" checkbox on record ${mostRecentOrder.id}`);
+                output.text(`   ✅ Invoice marked as checked (AI cost calculation triggered)`);
             } catch (e) {
-                output.text(`❌ Failed to mark invoice as checked: ${e.message}`);
+                output.text(`   ❌ Failed to mark invoice as checked: ${e.message}`);
             }
             
         } catch (e) {
@@ -436,62 +356,43 @@ if (overrideField) {
 }
 
 // === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
-output.text("\n⏳ Waiting 30 seconds for payment automation and AI cost calculation...");
-output.text("   (This allows the AI to analyze the invoice and calculate TotalCost AI)");
+output.text("\n⏳ Waiting 30s for AI to analyze invoice and calculate cost...");
 for (let i = 1; i <= 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
-    if (i % 5 === 0) {
-        output.text(`   ... ${i} seconds elapsed ...`);
+    if (i % 10 === 0) {
+        output.text(`   ${i}s...`);
     }
 }
-output.text("   ✓ Wait complete");
 
 // === GET TOTAL COST AI WITH RETRY ===
 let totalCostAI = null;
 if (orderRecordId) {
-    output.text(`\n💰 Fetching TotalCost AI from order ${orderRecordId}...`);
-    
     // Try up to 3 times with additional waits if null
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
             const orderRecord = await ordersTable.selectRecordAsync(orderRecordId);
             totalCostAI = orderRecord.getCellValue(TOTAL_COST_FIELD);
-            output.text(`   Attempt ${attempt}: TotalCost AI = ${totalCostAI !== null ? totalCostAI : "NOT CALCULATED YET"}`);
             
-            if (totalCostAI === null && attempt < 3) {
-                output.text(`   ⚠️ TotalCost AI is still null, waiting another 15 seconds...`);
+            if (totalCostAI !== null) {
+                output.text(`   ✅ TotalCost AI retrieved: ${totalCostAI}`);
+                break; // Exit loop if we got a value
+            } else if (attempt < 3) {
+                output.text(`   ⏳ TotalCost not ready, waiting 15s more (attempt ${attempt}/3)...`);
                 for (let i = 1; i <= 15; i++) {
                     await new Promise(r => setTimeout(r, 1000));
-                    if (i % 5 === 0) {
-                        output.text(`      ... ${i} seconds elapsed ...`);
-                    }
                 }
-                output.text(`      ✓ Additional wait complete, retrying...`);
-            } else if (totalCostAI !== null) {
-                output.text(`   ✅ TotalCost AI successfully retrieved: ${totalCostAI}`);
-                break; // Exit loop if we got a value
+            } else {
+                output.text(`   ⚠️ TotalCost AI still null after ${attempt} attempts`);
             }
         } catch (e) {
-            output.text(`   ❌ Error fetching TotalCost AI (attempt ${attempt}): ${e.message}`);
+            output.text(`   ❌ Error fetching TotalCost AI: ${e.message}`);
         }
-    }
-    
-    if (totalCostAI === null) {
-        output.text(`   ⚠️ TotalCost AI is still null after all attempts - AI may need more time or failed`);
     }
 }
 
 // === UPDATE PAYMENT PROOF ===
 if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
-    output.text(`\n💳 Looking for payment record with Order#: ${orderNumber}...`);
-    
-    // Debug: Show payments table fields
-    output.text(`\nPayments table fields:`);
-    for (const field of paymentsTable.fields) {
-        if (field.name.toLowerCase().includes("amount") || field.name.toLowerCase().includes("payment")) {
-            output.text(`  - "${field.name}" (${field.type})`);
-        }
-    }
+    output.text(`\n💳 Updating payment record for Order#: ${orderNumber}...`);
     
     try {
         // Query payments table for matching order# text field
@@ -502,16 +403,10 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
         // Find payment record with matching order# text
         const paymentMatch = paymentsQuery.records.find(r => {
             const cellValue = r.getCellValue("order# text");
-            const match = String(cellValue) === String(orderNumber);
-            if (match) {
-                output.text(`✓ Found payment with order# text: ${cellValue}`);
-            }
-            return match;
+            return String(cellValue) === String(orderNumber);
         });
         
         if (paymentMatch) {
-            output.text(`✓ Found payment record: ${paymentMatch.id}`);
-            
             // Build payment update object
             const paymentUpdateFields = {
                 [PAYMENT_PROOF_DEST_FIELD]: paymentProofAttachment,
@@ -519,36 +414,19 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
             };
             
             // Calculate payment amount if we have percentage and total cost
-            output.text(`\n📊 Payment calculation debug:`);
-            output.text(`  - Payment % raw: ${JSON.stringify(paymentPercentRaw)}`);
-            output.text(`  - TotalCost AI: ${totalCostAI}`);
-            
             if (paymentPercentRaw && totalCostAI !== null) {
                 const paymentPercent = normalizePercentage(paymentPercentRaw);
                 const totalCost = normalizeToNumber(totalCostAI);
                 
-                output.text(`  - Payment % normalized: ${paymentPercent} (as decimal)`);
-                output.text(`  - TotalCost normalized: ${totalCost}`);
-                
                 if (paymentPercent !== null && totalCost !== null) {
                     const paymentAmount = totalCost * paymentPercent;
                     paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD] = paymentAmount;
-                    output.text(`💰 Calculated payment amount: ${totalCost} × ${paymentPercent} = ${paymentAmount}`);
-                } else {
-                    output.text(`⚠️ Could not normalize payment values`);
+                    output.text(`   💰 Payment amount: ${totalCost} × ${Math.round(paymentPercent * 100)}% = ${paymentAmount}`);
                 }
-            } else {
-                output.text(`⚠️ Missing payment percentage or TotalCost AI for calculation`);
             }
             
             await paymentsTable.updateRecordAsync(paymentMatch.id, paymentUpdateFields);
-            
-            output.text(`💳 Updated payment proof with ${paymentProofAttachment.length} attachment(s)`);
-            output.text(`✅ Payment proof copied to payments table`);
-            output.text(`✅ Marked "Payment Released" checkbox`);
-            if (paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD]) {
-                output.text(`✅ Set payment amount: ${paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD]}`);
-            }
+            output.text(`   ✅ Payment updated (proof, amount, released)`);
         } else {
             output.text(`⚠️ No payment record found for order ${orderNumber}`);
         }
