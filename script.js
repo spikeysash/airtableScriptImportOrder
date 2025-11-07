@@ -347,14 +347,12 @@ output.text(`\n📋 Looking for most recent order record...`);
 const overrideField = ordersTable.fields.find(f => f.name.toLowerCase().includes("override") && !f.name.toLowerCase().includes("checked"));
 output.text(`Override field found: ${overrideField?.name || "NOT FOUND"}`);
 
-// Store for later use in payment calculation
+// Store order record ID for later use in payment calculation
 let orderRecordId = null;
-let totalCostAI = null;
 
 if (overrideField) {
     // Query orders table and sort by ID descending (most recent first)
     const ordersQuery = await ordersTable.selectRecordsAsync({
-        fields: ["ID", TOTAL_COST_FIELD],
         sorts: [{ field: "ID", direction: "desc" }]
     });
     
@@ -363,12 +361,8 @@ if (overrideField) {
     if (ordersQuery.records.length > 0) {
         const mostRecentOrder = ordersQuery.records[0];
         orderRecordId = mostRecentOrder.id;
-        totalCostAI = mostRecentOrder.getCellValue(TOTAL_COST_FIELD);
         
         output.text(`Most recent order ID: ${mostRecentOrder.id}`);
-        if (totalCostAI) {
-            output.text(`TotalCost AI: ${totalCostAI}`);
-        }
         
         try {
             // Build update object
@@ -415,9 +409,22 @@ if (overrideField) {
     output.text("⚠️ order#override field not found in orders table");
 }
 
-// === WAIT FOR PAYMENT AUTOMATION ===
-output.text("\n⏳ Waiting 5 seconds for payment automation...");
+// === WAIT FOR PAYMENT AUTOMATION & AI CALCULATION ===
+output.text("\n⏳ Waiting 5 seconds for payment automation and AI cost calculation...");
 await new Promise(r => setTimeout(r, 5000));
+
+// === GET TOTAL COST AI ===
+let totalCostAI = null;
+if (orderRecordId) {
+    output.text(`\n💰 Fetching TotalCost AI from order ${orderRecordId}...`);
+    try {
+        const orderRecord = await ordersTable.selectRecordAsync(orderRecordId);
+        totalCostAI = orderRecord.getCellValue(TOTAL_COST_FIELD);
+        output.text(`TotalCost AI value: ${totalCostAI !== null ? totalCostAI : "NOT CALCULATED YET"}`);
+    } catch (e) {
+        output.text(`⚠️ Could not read order record: ${e.message}`);
+    }
+}
 
 // === UPDATE PAYMENT PROOF ===
 if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentProofAttachment.length > 0 && paymentProofAttachment[0].url) {
@@ -449,15 +456,26 @@ if (paymentProofAttachment && Array.isArray(paymentProofAttachment) && paymentPr
             };
             
             // Calculate payment amount if we have percentage and total cost
-            if (paymentPercentRaw && totalCostAI) {
+            output.text(`\n📊 Payment calculation debug:`);
+            output.text(`  - Payment % raw: ${JSON.stringify(paymentPercentRaw)}`);
+            output.text(`  - TotalCost AI: ${totalCostAI}`);
+            
+            if (paymentPercentRaw && totalCostAI !== null) {
                 const paymentPercent = normalizeToNumber(paymentPercentRaw);
                 const totalCost = normalizeToNumber(totalCostAI);
+                
+                output.text(`  - Payment % normalized: ${paymentPercent}`);
+                output.text(`  - TotalCost normalized: ${totalCost}`);
                 
                 if (paymentPercent !== null && totalCost !== null) {
                     const paymentAmount = totalCost * paymentPercent;
                     paymentUpdateFields[PAYMENT_AMOUNT_DEST_FIELD] = paymentAmount;
                     output.text(`💰 Calculated payment amount: ${totalCost} × ${paymentPercent} = ${paymentAmount}`);
+                } else {
+                    output.text(`⚠️ Could not normalize payment values`);
                 }
+            } else {
+                output.text(`⚠️ Missing payment percentage or TotalCost AI for calculation`);
             }
             
             await paymentsTable.updateRecordAsync(paymentMatch.id, paymentUpdateFields);
