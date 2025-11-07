@@ -6,6 +6,8 @@ const SUPPLIER_FIELD = "Supplier";
 const SUPPLIER_TABLE = "suppliers info";
 const SUPPLIER_NAME_FIELD = "Company Name";
 const COMPANY_INFO_FIELD = "company info";
+const NOTIFY_EMAIL_FIELD = "Notify Email";
+const EMAIL_SOURCE_FIELD = "email";
 const IMPORTED_FIELD = "imported";
 const STATUS_FIELD = "status";
 
@@ -31,7 +33,7 @@ output.text(`📦 Importing all items for order ${orderNumber}...`);
 
 // === FETCH MATCHING RECORDS ===
 let query = await oldOrdersTable.selectRecordsAsync({
-    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, IMPORTED_FIELD]
+    fields: ["order #", "sku clean", "U/Ord", "company name", COMPANY_INFO_FIELD, EMAIL_SOURCE_FIELD, IMPORTED_FIELD]
 });
 let matching = query.records.filter(r => String(r.getCellValue("order #")) === String(orderNumber));
 if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderNumber}.`);
@@ -109,7 +111,7 @@ function normalizeToNumber(value) {
 }
 
 // === FIND OR CREATE SUPPLIER ===
-async function getSupplierIdByName(rawValue, companyInfoRaw) {
+async function getSupplierIdByName(rawValue, companyInfoRaw, emailRaw) {
     const name = normalizeToString(rawValue);
     if (!name) {
         output.text(`⚠️ No supplier name found (raw value: ${JSON.stringify(rawValue)})`);
@@ -137,30 +139,37 @@ async function getSupplierIdByName(rawValue, companyInfoRaw) {
             if (Array.isArray(companyInfoRaw) && companyInfoRaw.length > 0) {
                 if (companyInfoRaw[0].url) {
                     // It's attachments - copy directly
-                    fields["company info"] = companyInfoRaw;
+                    fields[COMPANY_INFO_FIELD] = companyInfoRaw;
                     output.text(`   ✓ Adding ${companyInfoRaw.length} attachment(s)`);
                 } else {
                     // Array of strings - join them
                     const text = companyInfoRaw.map(item => normalizeToString(item)).filter(s => s).join(", ");
                     if (text) {
-                        fields["company info"] = text;
+                        fields[COMPANY_INFO_FIELD] = text;
                         output.text(`   ✓ Adding text: ${text}`);
                     }
                 }
             } else if (typeof companyInfoRaw === 'string') {
                 // Plain text
-                fields["company info"] = companyInfoRaw;
+                fields[COMPANY_INFO_FIELD] = companyInfoRaw;
                 output.text(`   ✓ Adding text: ${companyInfoRaw}`);
             } else {
                 // Try to normalize
                 const normalized = normalizeToString(companyInfoRaw);
                 if (normalized) {
-                    fields["company info"] = normalized;
+                    fields[COMPANY_INFO_FIELD] = normalized;
                     output.text(`   ✓ Adding normalized: ${normalized}`);
                 }
             }
-        } else {
-            output.text(`   ⚠️ No company info in source`);
+        }
+        
+        // Add email if available
+        if (emailRaw) {
+            const email = normalizeToString(emailRaw);
+            if (email) {
+                fields[NOTIFY_EMAIL_FIELD] = email;
+                output.text(`   ✓ Adding email: ${email}`);
+            }
         }
         
         const newId = await supplierTable.createRecordAsync(fields);
@@ -182,20 +191,23 @@ for (let i = 0; i < matching.length; i++) {
     const qtyRaw = r.getCellValue("U/Ord");
     const supplierNameRaw = r.getCellValue("company name");
     const companyInfoRaw = r.getCellValue(COMPANY_INFO_FIELD);
+    const emailRaw = r.getCellValue(EMAIL_SOURCE_FIELD);
     
     // Debug output for each record
     output.text(`\n--- Record ${i + 1}/${matching.length} ---`);
     output.text(`Raw company name: ${JSON.stringify(supplierNameRaw)}`);
     output.text(`Raw company info: ${JSON.stringify(companyInfoRaw)}`);
+    output.text(`Raw email: ${JSON.stringify(emailRaw)}`);
     
     // Normalize all values to prevent [object Object] errors
     const sku = normalizeToString(skuRaw);
     const qty = normalizeToNumber(qtyRaw);
     const supplierName = normalizeToString(supplierNameRaw);
+    const email = normalizeToString(emailRaw);
     
-    output.text(`Normalized: SKU="${sku}", Qty=${qty}, Supplier="${supplierName}"`);
+    output.text(`Normalized: SKU="${sku}", Qty=${qty}, Supplier="${supplierName}", Email="${email}"`);
     
-    const supplierId = await getSupplierIdByName(supplierNameRaw, companyInfoRaw);
+    const supplierId = await getSupplierIdByName(supplierNameRaw, companyInfoRaw, emailRaw);
     output.text(`Supplier ID: ${supplierId}`);
     
     // Build fields object, only including valid values
