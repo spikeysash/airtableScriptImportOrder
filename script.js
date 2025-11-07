@@ -45,7 +45,7 @@ if (matching.length === 0) return output.text(`⚠️ No SKUs found for ${orderN
 // Get the invoice attachment from the first record (all records in the order should have the same invoice)
 const invoiceAttachment = matching[0].getCellValue(INVOICE_SOURCE_FIELD);
 if (invoiceAttachment) {
-    output.text(`📎 Found invoice attachment(s) for this order`);
+    output.text(`📎 Found invoice attachment for this order`);
 }
 
 // === LOAD EXISTING SUPPLIERS ===
@@ -342,7 +342,7 @@ if (overrideField) {
         output.text(`Most recent order ID: ${mostRecentOrder.id}`);
         
         try {
-            // Build update object with order#override
+            // Build update object
             const updateFields = { 
                 [overrideField.name]: String(orderNumber) 
             };
